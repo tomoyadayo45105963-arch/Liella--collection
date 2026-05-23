@@ -13,78 +13,32 @@
      → プロジェクト設定 > アプリ > firebaseConfig をコピー
 ============================================================ -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-    from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc, onSnapshot }
-    from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+  const STORAGE_KEY = "liella_cd_collection_owned_v1";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBqTJ5kbOvrrVHWrlJF2wnCKXb20KjcRoE",
-  authDomain: "liella-collection.firebaseapp.com",
-  projectId: "liella-collection",
-  storageBucket: "liella-collection.firebasestorage.app",
-  messagingSenderId: "1434372741",
-  appId: "1:1434372741:web:103d09e9f66713fceb77ec"
-};
-
-  // ★ あなたのGmailアドレスを入力（このアドレスのみ編集可能）
-  const OWNER_EMAIL = "tomoyadayo45105963@gmail.com";
-
-  // ─── Firebase 初期化 ───────────────────────────────────────
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
-  const colRef = doc(db, "collection", "owned");
-
-  let owned   = {};
-  let isOwner = false;
-  let unsubSnap = null;
-
-  // ─── リアルタイム同期 ──────────────────────────────────────
-  function startSync() {
-    if (unsubSnap) unsubSnap();
-    unsubSnap = onSnapshot(colRef, snap => {
-      owned = snap.exists() ? (snap.data().ids || {}) : {};
-      render();
-    });
-  }
-
-  async function saveOwned() {
-    await setDoc(colRef, { ids: owned });
-  }
-
-  // ─── 認証 ────────────────────────────────────────────────
-  onAuthStateChanged(auth, user => {
-    isOwner = !!(user && user.email === OWNER_EMAIL);
-    updateAuthUI(user);
-    render();
-  });
-
-  function updateAuthUI(user) {
-    const btn = document.getElementById("authBtn");
-    if (!btn) return;
-    if (user) {
-      btn.textContent = "ログアウト";
-      btn.onclick = () => signOut(auth);
-      if (isOwner) {
-        document.getElementById("ownerBadge").style.display = "inline-flex";
-      }
-    } else {
-      btn.textContent = "Googleでログイン";
-      btn.onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
-      document.getElementById("ownerBadge").style.display = "none";
+  function loadOwned() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    } catch {
+      return {};
     }
   }
 
-  // ─── チェック操作 ─────────────────────────────────────────
-  window.toggleOwned = async (id) => {
-    if (!isOwner) return;
-    owned[id] = !owned[id];
-    render();
-    await saveOwned();
-  };
+  let owned = loadOwned();
 
+  function saveOwned() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(owned));
+  }
+
+  function startSync() {
+    render();
+  }
+
+  // ─── チェック操作 ─────────────────────────────────────────
+  window.toggleOwned = (id) => {
+    owned[id] = !owned[id];
+    saveOwned();
+    render();
+  };
   // ─── 描画 ─────────────────────────────────────────────────
   const TODAY = new Date();
   const CATS  = ["全て","アルバム","シングル","挿入歌","ユニット","BD特典","クラブ限定","その他"];
@@ -236,9 +190,9 @@ const firebaseConfig = {
         const isOwned = !!owned[c.id];
         const fut     = isFuture(c.d);
         const ds      = c.d.slice(5).replace("-", "/");
-        const editable = isOwner ? `onclick="toggleOwned(${c.id})"` : ``;
+        const editable = `onclick="toggleOwned(${c.id})"`;
         html += `
-          <div class="cd-item${isOwned ? " is-owned" : ""}${isOwner ? " editable" : ""}" ${editable}>
+          <div class="cd-item${isOwned ? " is-owned" : ""} editable" ${editable}>
             <span class="check-icon">${isOwned ? "✓" : ""}</span>
             <div class="cd-info">
               <div class="cd-title">${c.t}${c.v ? `<span class="cd-ver">【${c.v}】</span>` : ""}</div>
@@ -488,10 +442,10 @@ const firebaseConfig = {
   <div class="header-inner">
     <div class="site-title">Liella! CD Collection</div>
     <div class="site-sub">Love Live! Superstar!! Liella! ディスコグラフィー コレクション管理</div>
-    <div class="auth-row">
+      <div class="auth-row">
       <button id="authBtn">読み込み中…</button>
-      <span id="ownerBadge">★ オーナー編集モード</span>
-    </div>
+     <span id="ownerBadge">★ オーナー編集モード</span>
+</div>
   </div>
 </header>
 
@@ -540,7 +494,7 @@ const firebaseConfig = {
   <div id="cdList"><div class="empty">読み込み中…</div></div>
 
   <div class="owner-note">
-    ※ チェックの編集はオーナーのみ可能です。閲覧はどなたでもできます。
+    ※ チェック状態はこのブラウザに保存されます。他の端末・他の人とは共有されません。
   </div>
 </main>
 
